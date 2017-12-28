@@ -30,6 +30,7 @@ class ImportServiceProvider extends ServiceProvider
         ]);
 
         $this->loadViewsFrom(resource_path('views/vendor'), 'import');
+        $this->app->make(Factory::class)->load(__DIR__ . '/../database/factories');
     }
 
 }
