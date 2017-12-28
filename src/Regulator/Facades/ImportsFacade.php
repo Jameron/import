@@ -1,8 +1,8 @@
-<?php namespace Jameron\Regulator\Facades;
+<?php namespace Jameron\Import\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
-class RegulatorFacade extends Facade
+class ImportFacade extends Facade
 {
 
     /**
@@ -12,6 +12,6 @@ class RegulatorFacade extends Facade
      */
     protected static function getFacadeAccessor()
     {
-        return 'regulator';
+        return 'import';
     }
 }
