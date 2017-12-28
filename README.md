@@ -37,9 +37,20 @@ composer update
         'Imports' => Jameron\Regulator\Facades\ImportsFacade::class,
 ```
 
-4) Publish the sass, js, and config:
+4) Publish the views and config:
 
 ```
 php artisan vendor:publish
 ```
 
+5) Seed the database with import permission and assign permission to admin role
+
+You can call it directly via command line or add it to your applications seeder file:
+
+Added to application seeder
+
+`database/seeds/DatabaseSeeder.php`
+
+```php
+$this->call(\Jameron\Import\database\seeds\ImportSeeder::class);
+```
