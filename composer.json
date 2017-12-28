@@ -1,0 +1,36 @@
+{
+    "name": "jameron/regulator",
+    "description": "Auth and role/permissions manager",
+    "keywords": ["roles", "permissions", "lms"],
+    "homepage": "http://cjmacfarlane.com",
+    "license": "MIT",
+    "type": "project",
+    "authors": [
+        {
+            "name": "Cameron Macfarlane",
+            "email": "cammac1984@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {"Jameron\\": "src/"}
+    },
+    "autoload-dev": {
+        "classmap": [
+            "tests/RegulatorTest.php"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Jameron\\Regulator\\RegulatorServiceProvider"
+            ],
+            "aliases": {
+                "Regulator": "Jameron\\Regulator\\Facades\\Facade"
+            }
+        }
+    },
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true
+    }
+}

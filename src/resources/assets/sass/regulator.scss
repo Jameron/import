@@ -1,0 +1,29 @@
+#successMessage {
+    transition: opacity 5s ease;
+}
+
+#statusMessage {
+    transition: opacity 5s ease;
+}
+
+#errorsMessage {
+    transition: opacity 10s ease;
+}
+
+.fadeout {
+    opacity: 0;
+}
+
+.online {
+    background: #0c0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+}
+
+.offline {
+    background: #f00;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+}
