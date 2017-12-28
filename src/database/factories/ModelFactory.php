@@ -10,3 +10,9 @@
 | database. Just tell the factory how a default model should look.
 |
 */
+$factory->defineAs(Jameron\Regulator\Models\Permission::class, 'upload_csv', function (Faker\Generator $faker) {
+    return [
+        'slug' => 'upload_csv',
+        'name' => 'Upload CSV',
+    ];
+});
