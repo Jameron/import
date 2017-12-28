@@ -60,3 +60,16 @@ Called via command line:
 ```bash
 php artisan db:seed --class=\\Jameron\\Import\\database\\seeds\\ImportSeeder
 ```
+
+6) Update your webpack.mix.js file
+
+```javascript
+   .js('resources/assets/import/js/upload.js', 'public/js/Regulator.js')
+   .sass('resources/assets/import/sass/upload.scss', 'public/css')
+```
+
+7) Compile it up:
+
+```
+npm run dev
+```

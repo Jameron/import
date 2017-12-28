@@ -25,6 +25,8 @@ class ImportServiceProvider extends ServiceProvider
     {
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         $this->publishes([
+            __DIR__.'/../resources/assets/js' => resource_path('assets/import/js'),
+            __DIR__.'/../resources/assets/sass' => resource_path('assets/import/sass'),
             __DIR__.'/../config/import.php' => config_path('import.php'),
             __DIR__.'/../resources/views' => resource_path('views/vendor'),
         ]);

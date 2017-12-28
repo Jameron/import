@@ -1,8 +1,4 @@
-<div class="custom-file">
-	<input type="file" class="custom-file-input" id="validatedCustomFile" required>
-	<label class="custom-file-label" for="validatedCustomFile">Choose file...</label>
-</div>
-
-<p class="button-group">
-    <button type="submit" class="btn btn-primary">Save</button>
-</p>
+<label class="custom-file d-block">
+	<input data-toggle="custom-file" data-target="#company-logo" type="file" name="company_logo" accept="image/png" class="custom-file-input">
+	<span id="company-logo" class="custom-file-control custom-file-name" data-content="Upload company logo..."></span>
+</label>
