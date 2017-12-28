@@ -1,7 +1,8 @@
 <?php
 
 $imports = [
-    'db_table_prefix' => '',
+'db_table_prefix' => '',
+'post_upload_route' => '/import'
     'roles' => [
         'admin' => [
             'enabled' => true

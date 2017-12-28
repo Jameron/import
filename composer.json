@@ -1,7 +1,7 @@
 {
-    "name": "jameron/regulator",
-    "description": "Auth and role/permissions manager",
-    "keywords": ["roles", "permissions", "lms"],
+    "name": "jameron/import",
+    "description": "A simle package to assist with importing data via csv.",
+    "keywords": ["csv", "import"],
     "homepage": "http://cjmacfarlane.com",
     "license": "MIT",
     "type": "project",
@@ -16,16 +16,16 @@
     },
     "autoload-dev": {
         "classmap": [
-            "tests/RegulatorTest.php"
+            "tests/ImportTest.php"
         ]
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Jameron\\Regulator\\RegulatorServiceProvider"
+                "Jameron\\Import\\ImportServiceProvider"
             ],
             "aliases": {
-                "Regulator": "Jameron\\Regulator\\Facades\\Facade"
+                "Import": "Jameron\\Import\\Facades\\Facade"
             }
         }
     },

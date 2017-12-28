@@ -1,11 +1,9 @@
-<?php namespace Jameron\Regulator\Validation;
+<?php namespace Jameron\Import\Validation;
 
-class PermissionValidator extends Validator
+class ImportValidator extends Validator
 {
 
     /**
-     * Validation rules for creating new \Jameron\Regulator\Models\Permission models.
-     *
      * @var array
      */
     public static $rules = [
