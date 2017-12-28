@@ -28,13 +28,13 @@ composer update
 2) Update your providers:
 
 ```php
-        Jameron\Regulator\RegulatorServiceProvider::class,
+        Jameron\Regulator\ImportsServiceProvider::class,
 ```
 
 3) Update your Facades:
 
 ```php
-        'Regulator' => Jameron\Regulator\Facades\RegulatorFacade::class,
+        'Imports' => Jameron\Regulator\Facades\ImportsFacade::class,
 ```
 
 4) Publish the sass, js, and config:
