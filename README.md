@@ -6,7 +6,7 @@ Your composer file would look like so:
 
 ```js
         "jameron/admin": "*",
-        "jameron/imports": "*",
+        "jameron/import": "*",
 ```
 
 Some older versions may not be compatible. Let's see if we can't get you up and running in 10 steps. If you are starting fresh, create your laravel application first thing:
@@ -53,4 +53,10 @@ Added to application seeder
 
 ```php
 $this->call(\Jameron\Import\database\seeds\ImportSeeder::class);
+```
+
+Called via command line:
+
+```bash
+php artisan db:seed --class=\\Jameron\\Import\\database\\seeds\\ImportSeeder
 ```
