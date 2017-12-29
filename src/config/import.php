@@ -12,6 +12,7 @@ $imports = [
 			'enabled' => false
 		],
 	],
+	'import_model' => App\Models\Example::class
 ];
 
 return $imports;
