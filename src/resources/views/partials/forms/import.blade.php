@@ -3,7 +3,9 @@
 	<span id="csv" class="custom-file-control custom-file-name" data-content="Upload csv file..."></span>
 </label>
 <p class="form-group">
-	<button type="submit" class="btn btn-primary">
-		Import
-	</button>
+	<div class="col-md-12">
+		<button type="submit" class="btn btn-primary">
+			Import
+		</button>
+	</div>
 </p>
