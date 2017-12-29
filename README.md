@@ -64,7 +64,7 @@ php artisan db:seed --class=\\Jameron\\Import\\database\\seeds\\ImportSeeder
 6) Update your webpack.mix.js file
 
 ```javascript
-   .js('resources/assets/import/js/upload.js', 'public/js/Regulator.js')
+   .js('resources/assets/import/js/upload.js', 'public/js/Upload.js')
    .sass('resources/assets/import/sass/upload.scss', 'public/css')
 ```
 
