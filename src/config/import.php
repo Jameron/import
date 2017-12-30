@@ -15,10 +15,10 @@ $imports = [
         ],
     ],
     /*
-     * The import model will be used to match your csv column headers to the table column names. Note, column headers are trimmed of white space, lowercased, and stripped of any character
+     * The import model will be used to match your csv column headers to the table column names. Note, column headers are trimmed of leading and trailing white space, lowercased, spaces converted to underscores, and stripped of any special character.
      * This mock model QuizScores might point to a table called quiz_scores
      * This quiz_scores table might have the following columns: [id, score, quiz_id, student_id, date_taken]
-     * quiz_id and student_id are foreign keys that point to a quiza table and a users table respectively.
+     * quiz_id and student_id are foreign keys that point to a quizs table and a users table respectively.
      * For data that reference relationals you can define them in the relationships array below.
      */
     'import_model' => App\Models\QuizScores::class,
