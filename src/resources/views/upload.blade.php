@@ -6,7 +6,7 @@
         @endslot
         @slot('body')
             @if(Gate::check('upload_csv'))
-                <form class="text-left" action="{{ url(config('import.post_import_route')) }}" method="POST" type="file" accept=".csv">
+                <form class="text-left" action="{{ url(config('import.post_import_route')) }}" method="POST" type="file"  enctype="multipart/form-data" accept=".csv">
                     <input type="hidden" name="_token" value="{{ csrf_token() }}">
                     @include('import::partials.forms.import', ['submitButtonText' => 'Import', 'mode'=>'create'])
                 </form>
