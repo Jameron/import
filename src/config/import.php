@@ -36,10 +36,8 @@ $imports = [
             'validator' => App\Http\Requests\UserRequest::class,
             'create_if_not_found' => true,
             'append_data' => [
-                [
-                    'password' => Hash::make('ChangeIt!')
-                ]
-            ],
+                'password' => Hash::make('ChangeIt!')
+            ]
             'extra_columns' => [
                 [
                     'column' => 'student_name',
