@@ -4,7 +4,7 @@ namespace Jameron\Import\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class ImportRequest extends FormRequest
+class ImportRequest extends FormRequest {
 
 	public function messages()
 	{
