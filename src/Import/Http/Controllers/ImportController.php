@@ -7,7 +7,7 @@ use Auth;
 use Validator;
 use Carbon\Carbon;
 use App\Http\Controllers\Controller;
-use Jameron\Import\Http\Requests\ImportRequest;
+use \Jameron\Import\Http\Requests\ImportRequest;
 
 class ImportController extends Controller
 {
@@ -27,36 +27,73 @@ class ImportController extends Controller
         $csv_rows = array_map('str_getcsv', file($csv));
         $num_rows = count($csv_rows);
         $raw_column_headers = array_shift($csv_rows);
+        $import_config = config('import'); 
+
         $this->setColumnHeaders($raw_column_headers);
         $this->cleanCsvHeadersData($this->column_headers);
+
+        $errors = collect();
 
         foreach($csv_rows as $row_index => $row) {
 
             $model = $this->parseRow($row, $row_index);
 
-            if($model) {
-                dd($model);
-            }
-
             $model_rules = (new $import_config['validator'])
                 ->rules();
 
             if($model_rules) {
-                $validator = Validator::make($new_model->toArray(), $model_rules);
+
+                $validator = Validator::make($model->toArray(), $model_rules);
+
                 if ($validator->fails()) {
-                    return $errors[] = $validator->messages();
+                    $errors->push($validator->messages());
                 } else {
-                    dd($new_model->toArray());
+                    $model->save();
                 }
             }
 
             if(count($errors)) {
-                return redirect('import')->withErrors($validator->messages());
+                return redirect('import')->withErrors($errors);
             }
         }
 
 		return view('import::upload');
 	}
+
+    public function parseRow($row, $row_index)
+    {
+
+        $model = resolve('App\ImportModel');
+        $model_columns_array = $model->getConnection()->getSchemaBuilder()->getColumnListing($model->getTable());
+        $import_config = config('import'); 
+        $relationships = $import_config['relationships'];
+        $errors = [];
+
+        foreach($this->column_headers as $key => $column_header) {
+
+
+            if(in_array($column_header, $model_columns_array)) {
+                $model->{$column_header} = $row[$key];
+            }
+
+            if(count($relationships)) {
+
+                $related_key = array_search($column_header, array_column($relationships, 'csv_column'));
+                $related_model = $this->parseRelationships($related_key, $relationships, $row, $key);
+
+                if($related_model) {
+                    $model->{$relationships[$related_key]['foreign_key']} = $related_model->{$relationships[$related_key]['reference_primary_key']};
+                } else {
+                    continue;
+                }
+
+            }
+
+        }
+
+        return $model;
+
+    }
 
     public function setColumnHeaders($headers)
     {
@@ -189,42 +226,6 @@ class ImportController extends Controller
 
             return false;
         }
-    }
-
-    public function parseRow($row, $row_index)
-    {
-
-        $model = resolve('App\ImportModel');
-        $model_columns_array = $model->getConnection()->getSchemaBuilder()->getColumnListing($model->getTable());
-        $import_config = config('import'); 
-        $relationships = $import_config['relationships'];
-        $errors = [];
-
-        foreach($this->column_headers as $key => $column_header) {
-
-            $new_model = resolve('App\ImportModel');
-
-            if(in_array($column_header, $model_columns_array)) {
-                $new_model->{$column_header} = $row[$key];
-            }
-
-            if(count($relationships)) {
-
-                $related_key = array_search($column_header, array_column($relationships, 'csv_column'));
-                $related_model = $this->parseRelationships($related_key, $relationships, $row, $key);
-
-                if($related_model) {
-                    $new_model->{$relationships[$related_key]['foreign_key']} = $related_model->{$relationships[$related_key]['reference_primary_key']};
-                } else {
-                    continue;
-                }
-            }
-
-        }
-
-
-        return $new_model;
-
     }
 
 }
