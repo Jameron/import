@@ -55,10 +55,19 @@ class ImportController extends Controller
                 }
 
             } else {
-                 $errors->push($validator->messages());
+                 $errors->push($response);
             }
         }
 
+        $error_bags = $errors->flatten();
+        if (count($error_bags) > 0) {
+            foreach($error_bags as $error_bag) {
+                foreach($error_bag->all() as $error) {
+                    echo $error;
+                }
+            }
+        }
+exit();
         return redirect('import')->withErrors($errors);
 
 	}
@@ -70,7 +79,7 @@ class ImportController extends Controller
         $model_columns_array = $model->getConnection()->getSchemaBuilder()->getColumnListing($model->getTable());
         $import_config = config('import'); 
         $relationships = $import_config['relationships'];
-        $errors = [];
+        $errors = collect();
 
         foreach($this->column_headers as $key => $column_header) {
 
@@ -98,14 +107,19 @@ class ImportController extends Controller
 
                 if(is_numeric($related_key)) {
 
-                    $related_model = $this->parseRelationships($related_key, $relationships, $row, $key, $row_index);
-                    if($related_model instanceof $relationships[$related_key]['model']) {
-                        $model->{$relationships[$related_key]['foreign_key']} = $related_model->{$relationships[$related_key]['reference_primary_key']};
+                    $response = $this->parseRelationships($related_key, $relationships, $row, $key, $row_index);
+                    if($response instanceof $relationships[$related_key]['model']) {
+                        $model->{$relationships[$related_key]['foreign_key']} = $response->{$relationships[$related_key]['reference_primary_key']};
                     } else {
+                        $errors->push($response);
                         continue;
                     }
                 } 
             }
+        }
+
+        if(count($errors)){
+            return $errors;
         }
 
         return $model;
@@ -165,8 +179,6 @@ class ImportController extends Controller
                         if(count($split_as_array)==2){
                             $result = array_combine($extra_column['maps_to'], $split_as_array);
                         }
-
-
                         // ['first_name'=>'Kevin','last_name'=>'price']
                     }
 
@@ -177,25 +189,20 @@ class ImportController extends Controller
 
                 }
             }
-
         }
+
         return $result;
     }
 
     public function parseRelationships($related_key, $relationships, $row, $key, $row_index)
     {
 
+        $errors = collect();
+
         $related_model = new $relationships[$related_key]['model'];
         $related_model = $related_model
             ->where($relationships[$related_key]['reference_field'], $row[$key])
             ->first();
-            
-            
-            /*
-             *DB::table($relationships[$related_key]['reference_table'])
-             *->where($relationships[$related_key]['reference_field'], $row[$key])
-             *->first();
-             */
 
         if(!$related_model && $relationships[$related_key]['create_if_not_found']) {
 
@@ -219,6 +226,7 @@ class ImportController extends Controller
             }
 
             if (isset($relationships[$related_key]['validator']) && !empty($relationships[$related_key]['validator'])) {
+
                 $rules = (new $relationships[$related_key]['validator'])->rules();
 
                 if($rules) {
@@ -234,7 +242,7 @@ class ImportController extends Controller
                     $validator = Validator::make($new_related_model->toArray(), $rules, $messages);
 
                     if ($validator->fails()) {
-                        return $errors[] = $validator->messages();
+                        $errors->push($validator->messages());
                     } else {
                         if (isset($relationships[$related_key]['append_data']) && is_array($relationships[$related_key]['append_data'])) {
                             foreach($relationships[$related_key]['append_data'] as $column_name => $column_data) {
@@ -246,6 +254,10 @@ class ImportController extends Controller
                     }
                 }
             }
+        }
+
+        if (count($errors)) {
+            return $errors;
         }
 
         return $related_model;
