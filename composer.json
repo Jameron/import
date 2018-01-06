@@ -25,7 +25,7 @@
                 "Jameron\\Import\\ImportServiceProvider"
             ],
             "aliases": {
-                "Import": "Jameron\\Import\\Facades\\Facade"
+                "Import": "Jameron\\Import\\Facades\\ImportFacade"
             }
         }
     },
