@@ -2,6 +2,8 @@
 
 namespace Jameron\Import;
 
+use DB;
+use Validator;
 use Illuminate\Http\Request;
 use Illuminate\Support\MessageBag;
 use Jameron\Import\Repositories\ImportRepository;
@@ -17,19 +19,22 @@ class Import
     protected $errors;
 
     /**
-     * The config/vendor/jameron/regulator.php configuration values.
+     * The csv data as an array.
      *
      * @var array
      */
     protected $csv_data;
+
+    /**
+     * The csv data first row cleaned up as an array.
+     *
+     * @var array
+     */
     protected $column_headers;
 
     /**
      * Constructor for Import.
      *
-     * @param  Snap\Taxonomy\Repositories\TaxonomyRepository  $repo
-     * @param  \Illuminate\Support\MessageBag  $errors
-     * @param  array  $config
      * @return void
      */
     public function __construct()
@@ -39,7 +44,7 @@ class Import
     }
 
     /**
-     * Inserts a Role model object
+     * Inserts data from csv file to a database
      *
      * @param  string|array $values
      * @return Snap\Taxonomy\Models\Role
@@ -279,5 +284,4 @@ class Import
         return $related_model;
     }
 
-}
 }

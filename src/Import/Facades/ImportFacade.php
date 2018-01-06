@@ -12,6 +12,6 @@ class ImportFacade extends Facade
      */
     protected static function getFacadeAccessor()
     {
-        return 'import';
+        return 'Import';
     }
 }

@@ -4,6 +4,7 @@ namespace Jameron\Import\Http\Controllers;
 
 use DB;
 use Auth;
+use Import;
 use Validator;
 use Carbon\Carbon;
 use App\Http\Controllers\Controller;
@@ -11,7 +12,6 @@ use \Jameron\Import\Http\Requests\ImportRequest;
 
 class ImportController extends Controller
 {
-
 
 	public function getImport()
 	{
@@ -29,3 +29,4 @@ class ImportController extends Controller
 
 	}
 
+}

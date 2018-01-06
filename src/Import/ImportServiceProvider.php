@@ -38,6 +38,10 @@ class ImportServiceProvider extends ServiceProvider
             $model = config('import.import_model');
             return new $model;
         });
+
+        $this->app->bind('Import', function ($app) {
+            return new \Jameron\Import\Import;
+        });
     }
 
 }
