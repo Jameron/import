@@ -1,4 +1,4 @@
-<?php namespace Jameron\Regulator\Validation;
+<?php namespace Jameron\Import\Validation;
 
 use Validator as V;
 
