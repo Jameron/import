@@ -175,8 +175,13 @@ class Import
                     $row[$key] = (preg_replace('/[^a-zA-Z_]/', '', $row[$key]));
                     $row[$key] = (trim($row[$key])=='') ? 0 : null; 
 
+                } else if ($column_type=="text" || $column_type=="string") {
+
+                    $row[$key] = utf8_encode($row[$key]);
+
                 }
-                $model->{$column_header} = $row[$key];
+
+                $model->{$column_header} = ($row[$key]);
             }
 
             if(count($relationships)) {
