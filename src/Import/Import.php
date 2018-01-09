@@ -12,11 +12,32 @@ class Import
 {
 
     /**
+     * Import configuration settings
+     *
+     * @var array
+     */
+    protected $config;
+
+    /**
      * Errors captured during validation or saving.
      *
      * @var \Illuminate\Support\MessageBag
      */
     protected $errors;
+
+    /**
+     * The number of new models inserted.
+     *
+     * @var integer
+     */
+    protected $new_models_count;
+
+    /**
+     * The number of new related models inserted.
+     *
+     * @var integer
+     */
+    protected $new_related_models = [];
 
     /**
      * The csv data as an array.
@@ -39,8 +60,9 @@ class Import
      */
     public function __construct()
     {
-
-
+        $this->config = config('import');
+        $this->errors = collect();
+        $this->new_models_count = 0;
     }
 
     /**
@@ -52,47 +74,68 @@ class Import
     public function import($csv_file)
     {
         $csv_rows = array_map('str_getcsv', file($csv_file));
-        $num_rows = count($csv_rows);
         $raw_column_headers = array_shift($csv_rows);
-        $import_config = config('import'); 
+        $num_rows = count($csv_rows);
 
         $this->setColumnHeaders($raw_column_headers);
         $this->cleanCsvHeadersData($this->column_headers);
+        $this->parseRows($csv_rows);
 
-        $errors = collect();
-
-        foreach($csv_rows as $row_index => $row) {
-
-            $response = $this->parseRow($row, $row_index);
-
-            if($response instanceof $import_config['import_model']) {
-
-                $model_rules = (new $import_config['validator'])
-                    ->rules();
-                $messages = (new $import_config['validator'])->messages();
-
-                if($model_rules) {
-
-                    $validator = Validator::make($response->toArray(), $model_rules, $messages);
-
-                    if ($validator->fails()) {
-                        $validator->getMessageBag()->add('row_error', '<strong>Errors on row:</strong> ' . ($row_index + 2) ); 
-                        $errors->push($validator->messages());
-                    } else {
-                        $response->save();
-                    }
-                }
-
-            } else {
-                 $errors->push($response);
-            }
-        }
-
-        $error_bags = $errors->flatten();
+        $error_bags = $this->errors->flatten();
+        $model_as_array = explode("\\", $this->config['import_model']);
+        $model_name = end($model_as_array);
+        $num_skipped_rows = $num_rows - $this->new_models_count;
 
         return [
-            'error_bags' => $error_bags
+            'error_bags' => $error_bags,
+            'new_models_count' => $this->new_models_count,
+            'model_name' => $model_name,
+            'num_skipped_rows' => $num_skipped_rows,
+            'new_related_models' => $this->new_related_models
         ];
+    }
+
+    public function validateModel($model, $row_index)
+    {
+
+        $model_rules = (new $this->config['validator'])
+            ->rules();
+        $messages = (new $this->config['validator'])->messages();
+
+        if($model_rules) {
+
+            $validator = Validator::make($model->toArray(), $model_rules, $messages);
+
+            if ($validator->fails()) {
+
+                $validator->getMessageBag()->add('row_error', ($row_index + 2) ); 
+                $this->errors->push($validator->messages());
+
+            } else {
+
+                $model->save();
+                $this->new_models_count++;
+            }
+        }
+    }
+
+    public function addErrors($errors)
+    {
+
+    }
+
+    public function parseRows($rows)
+    {
+        foreach($rows as $row_index => $row) {
+
+            $response = $this->parseRow($row, $row_index);
+            if($response instanceof $this->config['import_model']) {
+                $this->validateModel($response, $row_index);
+            } else {
+                // related model error
+                $this->errors->push($response);
+            }
+        }
     }
 
     public function setColumnHeaders($headers)
@@ -106,8 +149,8 @@ class Import
 
         $model = resolve('App\ImportModel');
         $model_columns_array = $model->getConnection()->getSchemaBuilder()->getColumnListing($model->getTable());
-        $import_config = config('import'); 
-        $relationships = $import_config['relationships'];
+        $this->config = config('import'); 
+        $relationships = $this->config['relationships'];
         $errors = collect();
 
         foreach($this->column_headers as $key => $column_header) {
@@ -117,15 +160,21 @@ class Import
                 $column_type = DB::getSchemaBuilder()->getColumnType($model->getTable(), $column_header);
 
                 if($column_type=="boolean") {
+
                     $row[$key] = (trim(strtolower($row[$key]))=='yes') ? 1 : 0; 
+
                 } else if ($column_type=="datetime") {
+
                     if( strtotime($row[$key])) {
                         $row[$key] = date( 'Y-m-d H:i:s', strtotime($row[$key])); 
                     } else {
                         $row[$key] = null;
                     }
-                } else if ($column_type=="integer") {
+
+                } else if ($column_type=="integer" || $column_type=="float") {
+                    $row[$key] = (preg_replace('/[^a-zA-Z_]/', '', $row[$key]));
                     $row[$key] = (trim($row[$key])=='') ? 0 : null; 
+
                 }
                 $model->{$column_header} = $row[$key];
             }
@@ -182,6 +231,7 @@ class Import
                 $this->setColumnHeaders(array_map('strtolower', $this->column_headers));
             }
         }
+
     }
 
     public function parseExtraColumns($relationships, $related_key, $row)
@@ -259,7 +309,7 @@ class Import
 
                     if ($validator->fails()) {
 
-                        $validator->getMessageBag()->add('row_error', '<strong>Errors on row:</strong> ' . ($row_index + 2)); 
+                        $validator->getMessageBag()->add('row_error', ($row_index + 2)); 
                         $errors->push($validator->messages());
 
                     } else {
@@ -269,8 +319,18 @@ class Import
                                 $new_related_model->{$column_name} = trim($column_data);
                             }
                         }
+
                         $new_related_model->save();
+
                         $related_model = $new_related_model;
+
+                        $model_as_array = explode("\\", $relationships[$related_key]['model']);
+                        $model_name = end($model_as_array);
+
+                        $parts = preg_split("/((?<=[a-z])(?=[A-Z])|(?=[A-Z][a-z]))/", $model_name);
+                        $model_name_clean = implode(" ", $parts);
+
+                        if (isset($this->new_related_models[$model_name_clean])) $this->new_related_models[$model_name_clean]++;else $this->new_related_models[$model_name_clean]=1;
 
                     }
                 }

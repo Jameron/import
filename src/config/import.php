@@ -27,17 +27,15 @@ $imports = [
      */
     'relationships' => [
         [
+            'create_if_not_found' => true,
             'csv_column' => 'student_id',
             'reference_table' => 'users',
             'reference_field' => 'student_identification_number',
             'reference_primary_key' => 'id',
             'foreign_key' => 'student_id',
+            'relationship' => 'belongsTo',
             'model' => App\Models\User::class,
             'validator' => App\Http\Requests\UserRequest::class,
-            'create_if_not_found' => true,
-            'append_data' => [
-                'password' => Hash::make('ChangeIt!')
-            ]
             'extra_columns' => [
                 [
                     'column' => 'student_name',
@@ -48,6 +46,9 @@ $imports = [
                     'column' => 'email',
                     'maps_to' => 'email',
                 ]
+            ],
+            'append_data' => [
+                'password' => Hash::make('ChangeIt!')
             ]
         ],
         [
