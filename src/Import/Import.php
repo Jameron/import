@@ -151,6 +151,7 @@ class Import
         $model_columns_array = $model->getConnection()->getSchemaBuilder()->getColumnListing($model->getTable());
         $this->config = config('import'); 
         $relationships = $this->config['relationships'];
+
         $errors = collect();
 
         foreach($this->column_headers as $key => $column_header) {
@@ -186,19 +187,32 @@ class Import
 
             if(count($relationships)) {
 
+                $belongs_to_relationships = ( array_filter($relationships, function($item) {
+                    return (isset($item['relationship']) && $item['relationship'] == 'belongsTo');
+                }));
+
+                $has_many_relationships = ( array_filter($relationships, function($item) {
+                    return (isset($item['relationship']) && $item['relationship'] == 'hasMany');
+                }));
+
                 $related_key = array_search($column_header, array_column($relationships, 'csv_column'));
 
                 if(is_numeric($related_key)) {
 
-                    $response = $this->parseRelationships($related_key, $relationships, $row, $key, $row_index);
+                    //$response = $this->parseRelationships($related_key, $relationships, $row, $key, $row_index);
+                    $response = $this->parseRelationship($relationships[$related_key], $row, $key, $row_index);
+
                     if($response instanceof $relationships[$related_key]['model']) {
                         $model->{$relationships[$related_key]['foreign_key']} = $response->{$relationships[$related_key]['reference_primary_key']};
                     } else {
                         $errors->push($response);
                         continue;
                     }
+
                 } 
+
             }
+
         }
 
         if(count($errors)){
@@ -239,10 +253,10 @@ class Import
 
     }
 
-    public function parseExtraColumns($relationships, $related_key, $row)
+    public function parseExtraColumns($extra_columns, $row)
     {
         $result = [];
-        foreach($relationships[$related_key]['extra_columns'] as $extra_column) {
+        foreach($extra_columns as $extra_column) {
 
             $column_matching_key = array_search($extra_column['column'], $this->column_headers);
             $matching_data = $row[$column_matching_key];
@@ -273,22 +287,23 @@ class Import
         return $result;
     }
 
-    public function parseRelationships($related_key, $relationships, $row, $key, $row_index)
+    public function parseRelationship($relationship, $row, $key, $row_index)
     {
 
         $errors = collect();
-        $related_model = new $relationships[$related_key]['model'];
+        $related_model = new $relationship['model'];
         $related_model = $related_model
-            ->where($relationships[$related_key]['reference_field'], $row[$key])
+            ->where($relationship['reference_field'], $row[$key])
             ->first();
 
-        if(!$related_model && $relationships[$related_key]['create_if_not_found']) {
+        if(!$related_model && $relationship['create_if_not_found']) {
 
-            $new_related_model = new $relationships[$related_key]['model'];
-            $new_related_model->{$relationships[$related_key]['reference_field']} = $row[$key];
+            $new_related_model = new $relationship['model'];
+            $new_related_model->{$relationship['reference_field']} = $row[$key];
 
-            if (isset($relationships[$related_key]['extra_columns']) && is_array($relationships[$related_key]['extra_columns'])) {
-                $result = $this->parseExtraColumns($relationships, $related_key, $row);
+
+            if (isset($relationship['extra_columns']) && is_array($relationship['extra_columns'])) {
+                $result = $this->parseExtraColumns($relationship['extra_columns'], $row);
                 if(isset($result)) {
 
                     // validate that the column matchup exists on the related table
@@ -303,10 +318,10 @@ class Import
                 }
             }
 
-            if (isset($relationships[$related_key]['validator']) && !empty($relationships[$related_key]['validator'])) {
+            if (isset($relationship['validator']) && !empty($relationship['validator'])) {
 
-                $rules = (new $relationships[$related_key]['validator'])->rules();
-                $messages = (new $relationships[$related_key]['validator'])->messages();
+                $rules = (new $relationship['validator'])->rules();
+                $messages = (new $relationship['validator'])->messages();
 
                 if($rules) {
 
@@ -319,8 +334,8 @@ class Import
 
                     } else {
 
-                        if (isset($relationships[$related_key]['append_data']) && is_array($relationships[$related_key]['append_data'])) {
-                            foreach($relationships[$related_key]['append_data'] as $column_name => $column_data) {
+                        if (isset($relationship['append_data']) && is_array($relationship['append_data'])) {
+                            foreach($relationship['append_data'] as $column_name => $column_data) {
                                 $new_related_model->{$column_name} = trim($column_data);
                             }
                         }
@@ -329,7 +344,7 @@ class Import
 
                         $related_model = $new_related_model;
 
-                        $model_as_array = explode("\\", $relationships[$related_key]['model']);
+                        $model_as_array = explode("\\", $relationship['model']);
                         $model_name = end($model_as_array);
 
                         $parts = preg_split("/((?<=[a-z])(?=[A-Z])|(?=[A-Z][a-z]))/", $model_name);
