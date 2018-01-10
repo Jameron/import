@@ -36,6 +36,7 @@ $imports = [
             'relationship' => 'belongsTo',
             'model' => App\Models\User::class,
             'validator' => App\Http\Requests\UserRequest::class,
+            'roles' => ['student'], // this only works for new users with the regulator package installed
             'extra_columns' => [
                 [
                     'column' => 'student_name',

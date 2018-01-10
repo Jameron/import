@@ -80,7 +80,6 @@ class Import
         $this->setColumnHeaders($raw_column_headers);
         $this->cleanCsvHeadersData($this->column_headers);
         $this->parseRows($csv_rows);
-
         $error_bags = $this->errors->flatten();
         $model_as_array = explode("\\", $this->config['import_model']);
         $model_name = end($model_as_array);
@@ -112,7 +111,6 @@ class Import
                 $this->errors->push($validator->messages());
 
             } else {
-
                 $model->save();
                 $this->new_models_count++;
             }
@@ -173,8 +171,12 @@ class Import
                     }
 
                 } else if ($column_type=="integer" || $column_type=="float") {
-                    $row[$key] = (preg_replace('/[^a-zA-Z_]/', '', $row[$key]));
-                    $row[$key] = (trim($row[$key])=='') ? 0 : null; 
+
+                    if($column_type=="float") {
+                        // try this if issues arrise with current:  #[^0-9\.]+#
+                        $row[$key] = (preg_replace('/[^0-9._]/', '', $row[$key]));
+                    }
+                    $row[$key] = (trim($row[$key])=='') ? 0 : $row[$key]; 
 
                 } else if ($column_type=="text" || $column_type=="string") {
 
@@ -361,6 +363,11 @@ class Import
             return $errors;
         }
 
+        if(isset($relationship['roles']) && count($relationship['roles']) ) {
+            foreach($relationship['roles'] as $role) {
+                $related_model->assignRole($role);
+            }
+        }
         return $related_model;
     }
 
