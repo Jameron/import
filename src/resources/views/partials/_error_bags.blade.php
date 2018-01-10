@@ -19,6 +19,7 @@
     </thead>
         @foreach($error_bags as $error_bag) 
             <tbody>
+                @if($error_bag)
             @foreach($error_bag->toArray() as $field => $error) 
                 @if($field!=='row_error')
                     <tr>
@@ -27,6 +28,7 @@
                     </tr>
                 @endif
             @endforeach
+        @endif
             </tbody>
         @endforeach
     </table>
