@@ -69,7 +69,7 @@ class Import
      * Inserts data from csv file to a database
      *
      * @param  string|array $values
-     * @return Snap\Taxonomy\Models\Role
+     * @return array
      */
     public function import($csv_file)
     {
@@ -80,18 +80,20 @@ class Import
         $this->setColumnHeaders($raw_column_headers);
         $this->cleanCsvHeadersData($this->column_headers);
         $this->parseRows($csv_rows);
-        $error_bags = $this->errors->flatten();
-        $model_as_array = explode("\\", $this->config['import_model']);
-        $model_name = end($model_as_array);
-        $num_skipped_rows = $num_rows - $this->new_models_count;
 
         return [
-            'error_bags' => $error_bags,
+            'error_bags' => $this->errors->flatten(),
             'new_models_count' => $this->new_models_count,
-            'model_name' => $model_name,
-            'num_skipped_rows' => $num_skipped_rows,
+            'model_name' => $this->getClassNameWithoutNamespace($this->config['import_model']),
+            'num_skipped_rows' => $num_rows - $this->new_models_count,
             'new_related_models' => $this->new_related_models
         ];
+    }
+
+    public function getClassNameWithoutNamespace($classname)
+    {
+        $model_name = (new \ReflectionClass($classname))->getShortName();
+        return $model_name;
     }
 
     public function validateModel($model, $row_index)
@@ -109,12 +111,13 @@ class Import
 
                 $validator->getMessageBag()->add('row_error', ($row_index + 2) ); 
                 $this->errors->push($validator->messages());
+                return false;
 
             } else {
-                $model->save();
-                $this->new_models_count++;
+                return true;
             }
         }
+
     }
 
     public function addErrors($errors)
@@ -128,7 +131,10 @@ class Import
 
             $response = $this->parseRow($row, $row_index);
             if($response instanceof $this->config['import_model']) {
-                $this->validateModel($response, $row_index);
+                if($this->validateModel($response, $row_index)){
+                    $response->save();
+                    $this->new_models_count++;
+                }
             } else {
                 // related model error
                 $this->errors->push($response);
@@ -142,12 +148,49 @@ class Import
         return $this;
     }
 
+    public function formatBoolean($string)
+    {
+        if($string!==0 && $string!==1) {
+            $string = (trim(strtolower($string))=='yes') ? 1 : 0; 
+        }
+        return $string;
+    }
+
+    public function formatDateTime($string)
+    {
+        if( strtotime($string)) {
+            $string = date( 'Y-m-d H:i:s', strtotime($string)); 
+        } else {
+            $string = null;
+        }
+        return $string;
+    }
+
+    public function convertEmptyToZero($string)
+    {
+        $string = (trim($string)=='') ? 0 : $string;
+        return $string;
+    }
+
+    public function formatInteger($string)
+    {
+        $string = $this->convertEmptyToZero($string);  
+        return $string;
+    }
+
+    public function formatFloat($string)
+    {
+        // try this if issues arrise with current:  #[^0-9\.]+#
+        $string = (preg_replace('/[^0-9._]/', '', $string));
+        $string = $this->convertEmptyToZero($string);  
+        return $string;
+    }
+
     public function parseRow($row, $row_index)
     {
 
         $model = resolve('App\ImportModel');
         $model_columns_array = $model->getConnection()->getSchemaBuilder()->getColumnListing($model->getTable());
-        $this->config = config('import'); 
         $relationships = $this->config['relationships'];
 
         $errors = collect();
@@ -159,24 +202,18 @@ class Import
                 $column_type = DB::getSchemaBuilder()->getColumnType($model->getTable(), $column_header);
 
                 if($column_type=="boolean") {
-
-                    $row[$key] = (trim(strtolower($row[$key]))=='yes') ? 1 : 0; 
-
+                    $row[$key] = $this->formatBoolean($row[$key]);
                 } else if ($column_type=="datetime") {
 
-                    if( strtotime($row[$key])) {
-                        $row[$key] = date( 'Y-m-d H:i:s', strtotime($row[$key])); 
-                    } else {
-                        $row[$key] = null;
-                    }
+                    $row[$key] = $this->formatDateTime($row[$key]);
 
-                } else if ($column_type=="integer" || $column_type=="float") {
+                } else if ($column_type=="integer") {
 
-                    if($column_type=="float") {
-                        // try this if issues arrise with current:  #[^0-9\.]+#
-                        $row[$key] = (preg_replace('/[^0-9._]/', '', $row[$key]));
-                    }
-                    $row[$key] = (trim($row[$key])=='') ? 0 : $row[$key]; 
+                    $row[$key] = $this->formatInteger($row[$key]);
+
+                } else if ($column_type=="float") {
+
+                    $row[$key] = $this->formatFloat($row[$key]);
 
                 } else if ($column_type=="text" || $column_type=="string") {
 
@@ -193,16 +230,11 @@ class Import
                     return (isset($item['relationship']) && $item['relationship'] == 'belongsTo');
                 }));
 
-                $has_many_relationships = ( array_filter($relationships, function($item) {
-                    return (isset($item['relationship']) && $item['relationship'] == 'hasMany');
-                }));
-
-                $related_key = array_search($column_header, array_column($relationships, 'csv_column'));
+                $related_key = array_search($column_header, array_column($belongs_to_relationships, 'csv_column'));
 
                 if(is_numeric($related_key)) {
 
-                    //$response = $this->parseRelationships($related_key, $relationships, $row, $key, $row_index);
-                    $response = $this->parseRelationship($relationships[$related_key], $row, $key, $row_index);
+                    $response = $this->parseBelongsToRelationship($relationships[$related_key], $row, $key, $row_index);
 
                     if($response instanceof $relationships[$related_key]['model']) {
                         $model->{$relationships[$related_key]['foreign_key']} = $response->{$relationships[$related_key]['reference_primary_key']};
@@ -225,6 +257,21 @@ class Import
 
     }
 
+    public function parseBelongsToRelationship($relationship, $row, $key, $row_index)
+    {
+        $response = $this->parseRelationship($relationship, $row, $key, $row_index);
+        return $response;
+    }
+
+    public function parseHasManyRelationship()
+    {
+        // <<<<<<<<<<<<<<<< NEW STUFF
+        /*
+         *$has_many_relationships = ( array_filter($relationships, function($item) {
+         *    return (isset($item['relationship']) && $item['relationship'] == 'hasMany');
+         *}));
+         */
+    }
 
     public function cleanCsvHeadersData($raw_column_headers)
     {
