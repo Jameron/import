@@ -1,25 +1,27 @@
 This package has been built to work with Laravel 5.4.33 and later. 
 
-This package contains methods and traits that can be used with your project, and optinoally you can use the views for your UX. If you are using the admin views, make sure you also require the admin package found here: [Admin package](https://github.com/jameron/admin)
+This package contains methods and traits that can be used with your project, and optionally you can use the views or just the view parials for your UX. If you are using the upload view, make sure you also require the admin package found here: [Admin package](https://github.com/jameron/admin)
 
 Your composer file would look like so:
 
-```js
+```json
         "jameron/admin": "*",
         "jameron/import": "*",
 ```
 
 Some older versions may not be compatible. Let's see if we can't get you up and running in 10 steps. If you are starting fresh, create your laravel application first thing:
 
+```bash
     composer create-project --prefer-dist laravel/laravel blog
+```
 
 1) Add the package to your compose.json file:
 
 ```json
-    "jameron/imports": "*",
+    "jameron/import": "*",
 ```
 
-```
+```bash
 composer update
 ```
 
@@ -39,11 +41,13 @@ composer update
 
 4) Publish the views and config:
 
-```
+```bash
+
 php artisan vendor:publish
+
 ```
 
-5) Seed the database with import permission and assign permission to admin role
+5) (Only if using Regulator for roles and permissions) Seed the database with import permission and assign permission to admin role
 
 You can call it directly via command line or add it to your applications seeder file:
 
@@ -70,7 +74,7 @@ php artisan db:seed --class=\\Jameron\\Import\\database\\seeds\\ImportSeeder
 
 7) Compile it up:
 
-```
+```bash
 npm run dev
 ```
 
