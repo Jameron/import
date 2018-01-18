@@ -23,7 +23,6 @@ class ImportServiceProvider extends ServiceProvider
      */
     public function boot(GateContract $gate=null, Router $router)
     {
-        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         $this->publishes([
             __DIR__.'/../resources/assets/js' => resource_path('assets/import/js'),
             __DIR__.'/../resources/assets/sass' => resource_path('assets/import/sass'),
