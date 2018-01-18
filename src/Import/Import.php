@@ -35,7 +35,7 @@ class Import
     /**
      * The number of new related models inserted.
      *
-     * @var integer
+     * @var array
      */
     protected $new_related_models = [];
 
@@ -52,6 +52,34 @@ class Import
      * @var array
      */
     protected $column_headers;
+
+    /**
+     * The csv data as an array.
+     *
+     * @var array
+     */
+    protected $headers_cleanup_rules = [];
+
+    /**
+     * The model to map csv data to.
+     *
+     * @var array
+     */
+    protected $import_model;
+
+    /**
+     * The validator request object.
+     *
+     * @var array
+     */
+    protected $validator;
+
+    /**
+     * The validator request object.
+     *
+     * @var array
+     */
+    protected $relationships;
 
     /**
      * Constructor for Import.
@@ -71,11 +99,16 @@ class Import
      * @param  string|array $values
      * @return array
      */
-    public function import($csv_file)
+    public function import($csv_file, $headers_cleanup_rules, $import_model, $validator, $relationships)
     {
         $csv_rows = array_map('str_getcsv', file($csv_file));
         $raw_column_headers = array_shift($csv_rows);
         $num_rows = count($csv_rows);
+
+        $this->setHeadersCleanupRules($headers_cleanup_rules);
+        $this->setImportModel($import_model);
+        $this->setValidator($validator);
+        $this->setRelationships($relationships);
 
         $this->setColumnHeaders($raw_column_headers);
         $this->cleanCsvHeadersData($this->column_headers);
@@ -84,10 +117,34 @@ class Import
         return [
             'error_bags' => $this->errors->flatten(),
             'new_models_count' => $this->new_models_count,
-            'model_name' => $this->getClassNameWithoutNamespace($this->config['import_model']),
+            'model_name' => $this->getClassNameWithoutNamespace($this->import_model),
             'num_skipped_rows' => $num_rows - $this->new_models_count,
             'new_related_models' => $this->new_related_models
         ];
+    }
+
+    public function setHeadersCleanupRules($headers_cleanup_rules)
+    {
+        $this->headers_cleanup_rules = $headers_cleanup_rules;
+        return $this;
+    }
+
+    public function setImportModel($import_model)
+    {
+        $this->import_model = $import_model;
+        return $this;
+    }
+
+    public function setValidator($validator)
+    {
+        $this->validator = $validator;
+        return $this;
+    }
+
+    public function setRelationships($relationships)
+    {
+        $this->relationships = $relationships;
+        return $this;
     }
 
     public function getClassNameWithoutNamespace($classname)
@@ -99,9 +156,9 @@ class Import
     public function validateModel($model, $row_index)
     {
 
-        $model_rules = (new $this->config['validator'])
+        $model_rules = (new $this->validator)
             ->rules();
-        $messages = (new $this->config['validator'])->messages();
+        $messages = (new $this->validator)->messages();
 
         if($model_rules) {
 
@@ -130,7 +187,7 @@ class Import
         foreach($rows as $row_index => $row) {
 
             $response = $this->parseRow($row, $row_index);
-            if($response instanceof $this->config['import_model']) {
+            if($response instanceof $this->import_model) {
                 if($this->validateModel($response, $row_index)){
                     $response->save();
                     $this->new_models_count++;
@@ -189,9 +246,9 @@ class Import
     public function parseRow($row, $row_index)
     {
 
-        $model = resolve('App\ImportModel');
+        $model = (new $this->import_model);
         $model_columns_array = $model->getConnection()->getSchemaBuilder()->getColumnListing($model->getTable());
-        $relationships = $this->config['relationships'];
+        $relationships = $this->relationships;
 
         $errors = collect();
 
@@ -276,7 +333,8 @@ class Import
     public function cleanCsvHeadersData($raw_column_headers)
     {
 
-        $cleanup_rules = config('import.csv_headers_cleanup_rules');
+        $cleanup_rules = $this->headers_cleanup_rules;
+        //config('import.csv_headers_cleanup_rules');
 
         if(isset($cleanup_rules) && is_array($cleanup_rules)) {
             if(in_array('trim', $cleanup_rules)) {

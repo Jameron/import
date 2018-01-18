@@ -34,11 +34,6 @@ class ImportServiceProvider extends ServiceProvider
         $this->loadViewsFrom(resource_path('views/vendor'), 'import');
 		$this->app->make(Factory::class)->load(__DIR__ . '/../database/factories');
 
-        $this->app->bind('App\ImportModel', function ($app) {
-            $model = config('import.import_model');
-            return new $model;
-        });
-
         $this->app->bind('Import', function ($app) {
             return new \Jameron\Import\Import;
         });

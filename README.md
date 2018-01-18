@@ -73,3 +73,77 @@ php artisan db:seed --class=\\Jameron\\Import\\database\\seeds\\ImportSeeder
 ```
 npm run dev
 ```
+
+
+8) Setup your routes and controllers
+
+
+```php
+
+Route::group(['middleware' => ['web', 'auth', 'role:admin']], function () {
+    Route::get('/import', 'ImportController@getImport');
+    Route::post('/import', 'ImportController@postImport');
+});
+```
+
+```php
+
+use \Jameron\Import\Http\Requests\ImportRequest;
+
+class ImportController extends Controller
+{
+
+    public function getImport()
+    {
+        return view('import::upload');
+    }
+
+    public function postImport(ImportRequest $request)
+    { 
+        $csv = $request->file('csv');
+        $headers_cleanup_rules = ['trim','pound_to_word_number','spaces_to_underscores', 'remove_special_characters','lowercase'];
+        $import_model = \App\Models\QuizScores::class;
+        $validator = \App\Http\Requests\QuizScoreRequest::class;
+
+        $relationships = [
+            [
+                'create_if_not_found' => true,
+                'csv_column' => 'student_id',
+                'reference_table' => 'users',
+                'reference_field' => 'student_identification_number',
+                'reference_primary_key' => 'id',
+                'foreign_key' => 'student_id',
+                'relationship' => 'belongsTo',
+                'model' => \App\Models\User::class,
+                'validator' => \App\Http\Requests\UserRequest::class,
+                'roles' => ['student'], // this only works for new users with the regulator package installed
+                'extra_columns' => [
+                    [
+                        'column' => 'student_name',
+                        'maps_to' => ['first_name','last_name'],
+                        'explode_on' => ' '
+                    ],
+                    [
+                        'column' => 'email',
+                        'maps_to' => 'email',
+                    ]
+                ],
+                'append_data' => [
+                    'password' => \Hash::make('ChangeIt!')
+                ]
+            ],
+            [
+                'csv_column' => 'test_name',
+                'reference_table' => 'tests',
+                'reference_field' => 'name', // This assumes that the name field on the tests table has a rule that forces unique
+                'reference_primary_key' => 'id', 
+                'foreign_key' => 'test_id',
+                'model' => \App\Models\Tests::class,
+                'validator' => \App\Http\Requests\TestRequest::class,
+            ] 
+        ];
+        
+    }
+
+}
+```
