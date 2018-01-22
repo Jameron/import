@@ -7,7 +7,7 @@
         @slot('body')
             @if(Gate::check('upload_csv'))
                 @include('admin::partials._error_bags')
-                <form class="text-left" action="{{ $upload_route }}" method="POST" type="file"  enctype="multipart/form-data" accept="{{ $accept }}">
+                <form class="text-left" action="{{ $upload_route or '' }}" method="POST" type="file"  enctype="multipart/form-data" accept="{{ $accept or '' }}">
                     <input type="hidden" name="_token" value="{{ csrf_token() }}">
                     @include('import::partials.forms.import', ['submitButtonText' => 'Import', 'mode'=>'create'])
                 </form>
