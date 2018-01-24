@@ -476,4 +476,32 @@ class Import
         return $related_model;
     }
 
+	public function	downloadCsv($filename, $columns, $data)
+	{
+
+		$headers = [
+			'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+			'Content-type'        => 'text/csv',
+			'Content-Disposition' => 'attachment; filename=' . $filename,
+			'Expires'             => '0',
+			'Pragma'              => 'public'
+		];
+
+		$callback = function() use ($columns, $data) 
+		{
+			$handle = fopen('php://output', 'w');
+			fputcsv($handle, $columns);
+			foreach($data as $row) {
+				fputcsv($handle, $row);
+			}				
+
+			fclose($handle);
+			$headers = array(
+				'Content-Type' => 'text/csv',
+			);
+		};
+
+    	return response()->stream($callback, 200, $headers);
+
+	}
 }
