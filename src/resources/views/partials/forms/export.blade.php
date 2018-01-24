@@ -1,7 +1,7 @@
 <div class="form-group">
     <div class="col-md-12">
         <label for="title">Title</label>
-        <input type="text" name="title" value="Note Title" class="form-control">
+        <input type="text" name="title" placeholder="Csv file title" class="form-control">
     </div>
 </div>
 <p class="form-group">
