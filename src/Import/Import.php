@@ -81,6 +81,8 @@ class Import
      */
     protected $relationships;
 
+    protected $column_headers_not_on_model;
+
     /**
      * Constructor for Import.
      *
@@ -105,6 +107,7 @@ class Import
         $raw_column_headers = array_shift($csv_rows);
         $num_rows = count($csv_rows);
 
+        // FYI the order of these method calls matters
         $this->setHeadersCleanupRules($headers_cleanup_rules);
         $this->setImportModel($import_model);
         $this->setValidator($validator);
@@ -112,6 +115,7 @@ class Import
 
         $this->setColumnHeaders($raw_column_headers);
         $this->cleanCsvHeadersData($this->column_headers);
+        $this->parseColumnHeaders();
         $this->parseRows($csv_rows);
 
         return [
@@ -177,23 +181,81 @@ class Import
 
     }
 
-    public function addErrors($errors)
+    public function getAndHandleBelongsToManyRelationships($column_key, $column_header, $row, $row_index, $model)
+    {
+        $belongs_to_relationships = array_values( array_filter($this->relationships, function($item) {
+            return (isset($item['relationship']) && $item['relationship'] == 'belongsTo');
+        }));
+
+        $related_key = array_search($column_header, array_column($belongs_to_relationships, 'csv_column'));
+
+        if(is_numeric($related_key)) {
+
+            $response = $this->parseBelongsToRelationship($belongs_to_relationships[$related_key], $row, $row_index, $column_key);
+
+            if($response instanceof $belongs_to_relationships[$related_key]['model']) {
+                $this->model->{$belongs_to_relationships[$related_key]['foreign_key']} = $response->{$belongs_to_relationships[$related_key]['reference_primary_key']};
+            } else {
+                $this->errors->push($response);
+                return;//continue;
+            }
+
+        }
+    }
+
+    public function getAndHandleHasManyRelationships($column_key, $column_header, $row, $row_index, $model)
     {
 
+        $has_many_relationships = array_values( array_filter($this->relationships, function($item) {
+            return (isset($item['relationship']) && $item['relationship'] == 'hasMany');
+        }));
+
+        $has_many_related_key = array_search($column_header, array_column($has_many_relationships, 'csv_column'));
+
+        if(is_numeric($has_many_related_key)) {
+
+            $response = $this->parseHasManyRelationship($has_many_relationships[$has_many_related_key], $row, $row_index, $column_key, $model->id);
+
+            if(!$response instanceof $has_many_relationships[$has_many_related_key]['model']) {
+                $this->errors->push($response);
+                return;//return;//return;//continue;
+            }
+        }
+    }
+
+    public function parseRelationships($row, $row_index, $model)
+    {
+        foreach($this->column_headers_not_on_model as $column_key => $column_header) {
+            /*
+             *$errors = collect();
+             *if(count($errors)){
+             *    return $errors;
+             *}
+             */
+            $this->getAndHandleBelongsToManyRelationships($column_key, $column_header, $row, $row_index, $model);
+            $this->getAndHandleHasManyRelationships($column_key, $column_header, $row, $row_index, $model);
+        }
     }
 
     public function parseRows($rows)
     {
         foreach($rows as $row_index => $row) {
 
+            // This creates a key=>value pair for the columns that are on the default model
             $response = $this->parseRow($row, $row_index);
+
             if($response instanceof $this->import_model) {
+
                 if($this->validateModel($response, $row_index)){
                     $response->save();
                     $this->new_models_count++;
+                    if(count($this->relationships)) {
+                        // pass in the default object, with its new ID
+                        $this->parseRelationships($row, $row_index, $response);
+                    }
                 }
             } else {
-                // related model error
+                // model error
                 $this->errors->push($response);
             }
         }
@@ -243,91 +305,177 @@ class Import
         return $string;
     }
 
-    public function parseRow($row, $row_index)
+    public function clean($column_type, $data)
+    {
+        
+        if($column_type=="boolean") {
+
+            $data = $this->formatBoolean($data);
+
+        } else if ($column_type=="datetime") {
+
+            $data = $this->formatDateTime($data);
+
+        } else if ($column_type=="integer") {
+
+            $data = $this->formatInteger($data);
+
+        } else if ($column_type=="float") {
+
+            $data = $this->formatFloat($data);
+
+        } else if ($column_type=="text" || $column_type=="string") {
+
+            $data = utf8_encode($data);
+        }
+        return $data;
+    }
+
+    public function addColumnHeaderNotOnModel($column_header)
+    {
+        $this->column_headers_not_on_model = $column_header;
+        return $this;
+    }
+
+    public function addColumnHeaderOnModel($column_header)
+    {
+        $this->column_headers_on_model = $column_header;
+        return $this;
+    }
+
+    public function parseColumnHeaders()
     {
 
+        $this->model = (new $this->import_model);
+        $model_columns_array = $this->model->getConnection()->getSchemaBuilder()->getColumnListing($this->model->getTable());
+
+        $column_headers_on_model =  array_filter($this->column_headers, function($column_header) use ($model_columns_array) {
+            return (in_array($column_header, $model_columns_array));
+        });
+
+        $column_headers_not_on_model = array_filter($this->column_headers, function($column_header) use ($model_columns_array) {
+            return (!in_array($column_header, $model_columns_array));
+        });
+
+        $this->addColumnHeaderOnModel($column_headers_on_model);
+        $this->addColumnHeaderNotOnModel($column_headers_not_on_model);
+
+    }
+
+    public function parseRow($row, $row_index)
+    {
         $model = (new $this->import_model);
-        $model_columns_array = $model->getConnection()->getSchemaBuilder()->getColumnListing($model->getTable());
-        $relationships = $this->relationships;
-
-        $errors = collect();
-
-        foreach($this->column_headers as $key => $column_header) {
-
-            if(in_array($column_header, $model_columns_array)) {
-
-                $column_type = DB::getSchemaBuilder()->getColumnType($model->getTable(), $column_header);
-
-                if($column_type=="boolean") {
-                    $row[$key] = $this->formatBoolean($row[$key]);
-                } else if ($column_type=="datetime") {
-
-                    $row[$key] = $this->formatDateTime($row[$key]);
-
-                } else if ($column_type=="integer") {
-
-                    $row[$key] = $this->formatInteger($row[$key]);
-
-                } else if ($column_type=="float") {
-
-                    $row[$key] = $this->formatFloat($row[$key]);
-
-                } else if ($column_type=="text" || $column_type=="string") {
-
-                    $row[$key] = utf8_encode($row[$key]);
-
-                }
-
-                $model->{$column_header} = ($row[$key]);
-            }
-
-            if(count($relationships)) {
-
-                $belongs_to_relationships = ( array_filter($relationships, function($item) {
-                    return (isset($item['relationship']) && $item['relationship'] == 'belongsTo');
-                }));
-
-                $related_key = array_search($column_header, array_column($belongs_to_relationships, 'csv_column'));
-
-                if(is_numeric($related_key)) {
-
-                    $response = $this->parseBelongsToRelationship($relationships[$related_key], $row, $key, $row_index);
-
-                    if($response instanceof $relationships[$related_key]['model']) {
-                        $model->{$relationships[$related_key]['foreign_key']} = $response->{$relationships[$related_key]['reference_primary_key']};
-                    } else {
-                        $errors->push($response);
-                        continue;
-                    }
-
-                } 
-
-            }
-
-        }
-
-        if(count($errors)){
-            return $errors;
+        foreach($this->column_headers_on_model as $column_key => $column_header) {
+            $column_type = DB::getSchemaBuilder()->getColumnType($this->model->getTable(), $column_header);
+            $row[$column_key] = $this->clean($column_type, $row[$column_key]);
+            $model->{$column_header} = ($row[$column_key]);
         }
 
         return $model;
 
     }
 
-    public function parseBelongsToRelationship($relationship, $row, $key, $row_index)
+    public function parseRelationship($relationship, $row, $row_index, $column_key, $model_id=null)
     {
-        $response = $this->parseRelationship($relationship, $row, $key, $row_index);
-        return $response;
+
+        $errors = collect();
+        $related_model = new $relationship['model'];
+        $related_model = $related_model
+            ->where($relationship['reference_field'], $row[$column_key])
+            ->first();
+
+        if(!$related_model && $relationship['create_if_not_found']) {
+
+            $new_related_model = new $relationship['model'];
+            $new_related_model->{$relationship['reference_field']} = $row[$column_key];
+
+
+            if (isset($relationship['extra_columns']) && is_array($relationship['extra_columns'])) {
+                $result = $this->parseExtraColumns($relationship['extra_columns'], $row);
+                if(isset($result)) {
+
+                    // validate that the column matchup exists on the related table
+                    $modelColumnsArray = $new_related_model->getConnection()->getSchemaBuilder()->getColumnListing($new_related_model->getTable());
+                    $values = array_intersect_key($result, array_flip($modelColumnsArray));
+
+                    if($values) {
+
+                        foreach($values as $value_key => $value) {
+
+                            $column_type = DB::getSchemaBuilder()->getColumnType($new_related_model->getTable(), $value_key);
+                            $value = $this->clean($column_type, $value);
+                            $new_related_model->{$value_key} = trim($value);
+
+                        }
+                    }
+                }
+            }
+
+            if (isset($relationship['validator']) && !empty($relationship['validator'])) {
+
+                $rules = (new $relationship['validator'])->rules();
+                $messages = (new $relationship['validator'])->messages();
+
+                if($rules) {
+
+                    $validator = Validator::make($new_related_model->toArray(), $rules, $messages);
+
+                    if ($validator->fails()) {
+
+                        $validator->getMessageBag()->add('row_error', ($row_index + 2)); 
+                        $errors->push($validator->messages());
+
+                    } else {
+
+                        if (isset($relationship['append_data']) && is_array($relationship['append_data'])) {
+                            foreach($relationship['append_data'] as $column_name => $column_data) {
+                                $new_related_model->{$column_name} = trim($column_data);
+                            }
+                        }
+                        
+                        // parent id of owning hasMany relationship
+                        if($model_id){
+                            $new_related_model->{$relationship['foreign_key']} = $model_id;
+                        }
+
+                        $new_related_model->save();
+
+                        $related_model = $new_related_model;
+
+                        $model_as_array = explode("\\", $relationship['model']);
+                        $model_name = end($model_as_array);
+
+                        $parts = preg_split("/((?<=[a-z])(?=[A-Z])|(?=[A-Z][a-z]))/", $model_name);
+                        $model_name_clean = implode(" ", $parts);
+
+                        if (isset($this->new_related_models[$model_name_clean])) $this->new_related_models[$model_name_clean]++;else $this->new_related_models[$model_name_clean]=1;
+
+                    }
+                }
+            }
+        }
+
+        if (count($errors)) {
+            return $errors;
+        }
+
+        if(isset($relationship['roles']) && count($relationship['roles']) ) {
+            foreach($relationship['roles'] as $role) {
+                $related_model->assignRole($role);
+            }
+        }
+        return $related_model;
     }
 
-    public function parseHasManyRelationship()
+    public function parseBelongsToRelationship($relationship, $row, $row_index, $column_key)
     {
-        // <<<<<<<<<<<<<<<< NEW STUFF
-        /*
-         *$has_many_relationships = ( array_filter($relationships, function($item) {
-         *    return (isset($item['relationship']) && $item['relationship'] == 'hasMany');
-         *}));
-         */
+        $response = $this->parseRelationship($relationship, $row, $row_index, $column_key);
+        return $response;
+    }
+    public function parseHasManyRelationship($relationship, $row, $row_index, $column_key, $model_id)
+    {
+        $response = $this->parseRelationship($relationship, $row, $row_index, $column_key, $model_id);
+        return $response;
     }
 
     public function cleanCsvHeadersData($raw_column_headers)
@@ -392,88 +540,6 @@ class Import
         }
 
         return $result;
-    }
-
-    public function parseRelationship($relationship, $row, $key, $row_index)
-    {
-
-        $errors = collect();
-        $related_model = new $relationship['model'];
-        $related_model = $related_model
-            ->where($relationship['reference_field'], $row[$key])
-            ->first();
-
-        if(!$related_model && $relationship['create_if_not_found']) {
-
-            $new_related_model = new $relationship['model'];
-            $new_related_model->{$relationship['reference_field']} = $row[$key];
-
-
-            if (isset($relationship['extra_columns']) && is_array($relationship['extra_columns'])) {
-                $result = $this->parseExtraColumns($relationship['extra_columns'], $row);
-                if(isset($result)) {
-
-                    // validate that the column matchup exists on the related table
-                    $modelColumnsArray = $new_related_model->getConnection()->getSchemaBuilder()->getColumnListing($new_related_model->getTable());
-                    $values = array_intersect_key($result, array_flip($modelColumnsArray));
-
-                    if($values) {
-                        foreach($values as $value_key => $value) {
-                            $new_related_model->{$value_key} = trim($value);
-                        }
-                    }
-                }
-            }
-
-            if (isset($relationship['validator']) && !empty($relationship['validator'])) {
-
-                $rules = (new $relationship['validator'])->rules();
-                $messages = (new $relationship['validator'])->messages();
-
-                if($rules) {
-
-                    $validator = Validator::make($new_related_model->toArray(), $rules, $messages);
-
-                    if ($validator->fails()) {
-
-                        $validator->getMessageBag()->add('row_error', ($row_index + 2)); 
-                        $errors->push($validator->messages());
-
-                    } else {
-
-                        if (isset($relationship['append_data']) && is_array($relationship['append_data'])) {
-                            foreach($relationship['append_data'] as $column_name => $column_data) {
-                                $new_related_model->{$column_name} = trim($column_data);
-                            }
-                        }
-
-                        $new_related_model->save();
-
-                        $related_model = $new_related_model;
-
-                        $model_as_array = explode("\\", $relationship['model']);
-                        $model_name = end($model_as_array);
-
-                        $parts = preg_split("/((?<=[a-z])(?=[A-Z])|(?=[A-Z][a-z]))/", $model_name);
-                        $model_name_clean = implode(" ", $parts);
-
-                        if (isset($this->new_related_models[$model_name_clean])) $this->new_related_models[$model_name_clean]++;else $this->new_related_models[$model_name_clean]=1;
-
-                    }
-                }
-            }
-        }
-
-        if (count($errors)) {
-            return $errors;
-        }
-
-        if(isset($relationship['roles']) && count($relationship['roles']) ) {
-            foreach($relationship['roles'] as $role) {
-                $related_model->assignRole($role);
-            }
-        }
-        return $related_model;
     }
 
 	public function	downloadCsv($filename, $columns, $data)
